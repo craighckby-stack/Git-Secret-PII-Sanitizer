@@ -1,0 +1,6 @@
+{
+  "name": "Git Secret and PII Sanitizer - Code Evolution Engine",
+  "description": "Automated secret scanner, PII detector, Git history purge generator, SARIF exporter, and AI Code Evolution Architect powered by Gemini high-thinking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
