@@ -6,9 +6,7 @@ An enterprise-grade secret scanner, PII detector, Git commit history purge gener
 
 ## 🌐 Live System Preview Links
 
-- **Shared App URL:** [https://ais-pre-w3ohwbrlkmimctvzipumce-483535245139.asia-southeast1.run.app](https://ais-pre-w3ohwbrlkmimctvzipumce-483535245139.asia-southeast1.run.app)
-- **Development App URL:** [https://ais-dev-w3ohwbrlkmimctvzipumce-483535245139.asia-southeast1.run.app](https://ais-dev-w3ohwbrlkmimctvzipumce-483535245139.asia-southeast1.run.app)
-
+https://ai.studio/apps/57c14614-897c-40cb-a90d-aeff7df60e68
 ---
 
 ## 📖 How to Use the System
