@@ -1,4 +1,4 @@
-please this system was desighned to be incorporated in emg 
+this system was desighned to be incorporated in emg 
 
 # Git Secret & PII Sanitizer — Code Evolution Engine
 
