@@ -1,3 +1,5 @@
+please this system was desighned to be incorporated in emg 
+
 # Git Secret & PII Sanitizer — Code Evolution Engine
 
 An enterprise-grade secret scanner, PII detector, Git commit history purge generator, SARIF exporter, and AI Code Evolution Architect powered by **Google Gemini 3.1 Pro (High Thinking)**.
