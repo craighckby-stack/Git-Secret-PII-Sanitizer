@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ChangeEvent, FC, MouseEvent } from 'react';
 import { sanitizeContent, isIgnoredPath, isBinaryContent, calculateScanStats } from '../lib/scanner';
 import { Finding, ScanStats, SkipBreakdown } from '../types';
 import { FolderSearch, FolderUp, FileText, ShieldAlert, CheckCircle2, AlertOctagon, FileCheck2, Loader2, Sparkles } from 'lucide-react';
@@ -8,16 +8,22 @@ interface FolderScannerProps {
   onAnalyzeAi?: (findings: Finding[]) => void;
 }
 
+interface ScanProgress {
+  current: number;
+  total: number;
+  currentFile: string;
+}
+
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 
-export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, onAnalyzeAi }) => {
+export const FolderScanner: FC<FolderScannerProps> = ({ onScanComplete, onAnalyzeAi }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0, currentFile: '' });
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [progress, setProgress] = useState<ScanProgress>({ current: 0, total: 0, currentFile: '' });
   const [findings, setFindings] = useState<Finding[]>([]);
   const [stats, setStats] = useState<ScanStats | null>(null);
 
-  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFolderSelect = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -43,13 +49,11 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
         currentFile: relativePath,
       });
 
-      // 1. Check if path is ignored (node_modules, .git, build, lock files)
       if (isIgnoredPath(relativePath)) {
         skipBreakdown.ignored++;
         continue;
       }
 
-      // 2. Size limit check
       if (file.size > MAX_FILE_SIZE) {
         skipBreakdown.tooLarge++;
         continue;
@@ -58,24 +62,22 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
       try {
         const text = await file.text();
 
-        // 3. Binary file check
         if (isBinaryContent(text)) {
           skipBreakdown.binary++;
           continue;
         }
 
-        // 4. Scan file content
         const { findings: fileFindings } = sanitizeContent(text, relativePath);
         if (fileFindings.length > 0) {
           localFindings.push(...fileFindings);
         }
         scannedCount++;
-      } catch (err) {
+      } catch {
         skipBreakdown.binary++;
       }
     }
 
-    const durationSeconds = (performance.now() - startTime) / 1000;
+    const durationSeconds = Number(((performance.now() - startTime) / 1000).toFixed(2));
     const computedStats = calculateScanStats(scannedCount, skipBreakdown, localFindings, durationSeconds);
 
     setFindings(localFindings);
@@ -84,6 +86,18 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
 
     onScanComplete(localFindings, computedStats);
   };
+
+  const handleButtonClick = (): void => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAiAnalysisClick = (): void => {
+    if (onAnalyzeAi) {
+      onAnalyzeAi(findings);
+    }
+  };
+
+  const progressPercentage = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -112,7 +126,7 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
         />
 
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleButtonClick}
           disabled={isScanning}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
         >
@@ -134,18 +148,18 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
       {isScanning && (
         <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-              Scanning: {progress.currentFile}
+            <span className="flex items-center gap-2 truncate max-w-[70%]">
+              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              <span className="truncate">Scanning: {progress.currentFile}</span>
             </span>
-            <span>
-              {progress.current} / {progress.total} files ({Math.round((progress.current / progress.total) * 100)}%)
+            <span className="shrink-0">
+              {progress.current} / {progress.total} files ({progressPercentage}%)
             </span>
           </div>
           <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-indigo-500 transition-all duration-150"
-              style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              style={{ width: `${progressPercentage}%` }}
             />
           </div>
         </div>
@@ -167,8 +181,8 @@ export const FolderScanner: React.FC<FolderScannerProps> = ({ onScanComplete, on
 
             {findings.length > 0 && onAnalyzeAi && (
               <button
-                onClick={() => onAnalyzeAi(findings)}
-                className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
+                onClick={handleAiAnalysisClick}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
                 Analyze Folder Findings with AI
