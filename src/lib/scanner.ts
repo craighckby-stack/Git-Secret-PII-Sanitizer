@@ -26,14 +26,15 @@ export function validateLuhn(cardNumber: string): boolean {
  */
 export function calculateEntropy(str: string): number {
   if (!str || str.length === 0) return 0;
-  const frequencies: Record<string, number> = {};
+  const frequencies = new Map<string, number>();
   for (let i = 0; i < str.length; i++) {
     const char = str[i];
-    frequencies[char] = (frequencies[char] || 0) + 1;
+    frequencies.set(char, (frequencies.get(char) || 0) + 1);
   }
   let entropy = 0;
-  for (const char in frequencies) {
-    const p = frequencies[char] / str.length;
+  const len = str.length;
+  for (const count of frequencies.values()) {
+    const p = count / len;
     entropy -= p * Math.log2(p);
   }
   return entropy;
@@ -308,7 +309,7 @@ export const SENSITIVE_PATTERNS: SecretPattern[] = [
     name: 'PEM / RSA / EC / SSH Private Key Block',
     category: 'Private Keys',
     regex: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]{30,2000}?-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g,
-    placeholder: '-----BEGIN PRIVATE KEY-----\n<PRIVATE_KEY_CONTENTS_REDACTED>\n-----END PRIVATE KEY-----',
+    placeholder: '[REDACTED_PRIVATE_KEY_BLOCK]',
     defaultConfidence: 'High',
     severity: 'Critical',
     description: 'Exposed cryptographic private key block',
@@ -381,6 +382,7 @@ export const SENSITIVE_PATTERNS: SecretPattern[] = [
  * Checks if a relative file path should be skipped during scanning.
  */
 export function isIgnoredPath(filePath: string): boolean {
+  if (!filePath) return false;
   const normalized = filePath.toLowerCase();
   const ignoredDirs = [
     'node_modules/', '.git/', 'dist/', 'build/', 'coverage/',
@@ -391,8 +393,12 @@ export function isIgnoredPath(filePath: string): boolean {
     'composer.lock', 'go.sum', 'Cargo.lock'
   ];
 
-  if (ignoredDirs.some(dir => normalized.includes(dir))) return true;
-  if (ignoredFiles.some(file => normalized.endsWith(file))) return true;
+  for (let i = 0; i < ignoredDirs.length; i++) {
+    if (normalized.includes(ignoredDirs[i])) return true;
+  }
+  for (let j = 0; j < ignoredFiles.length; j++) {
+    if (normalized.endsWith(ignoredFiles[j])) return true;
+  }
   return false;
 }
 
@@ -402,11 +408,11 @@ export function isIgnoredPath(filePath: string): boolean {
 export function isBinaryContent(content: string): boolean {
   if (!content) return false;
   const sample = content.slice(0, 1024);
-  let nullBytes = 0;
-  for (let i = 0; i < sample.length; i++) {
-    if (sample.charCodeAt(i) === 0) nullBytes++;
+  const len = sample.length;
+  for (let i = 0; i < len; i++) {
+    if (sample.charCodeAt(i) === 0) return true;
   }
-  return nullBytes > 0;
+  return false;
 }
 
 /**
@@ -417,6 +423,10 @@ export function sanitizeContent(
   filePath: string = 'snippet.txt',
   repoName?: string
 ): { sanitizedContent: string; findings: Finding[] } {
+  if (!content) {
+    return { sanitizedContent: content || '', findings: [] };
+  }
+
   const findings: Finding[] = [];
   let sanitizedContent = content;
   const lines = content.split(/\r?\n/);
@@ -531,10 +541,11 @@ export function calculateScanStats(
 
   const findingsByCategory: Record<string, number> = {};
 
-  findings.forEach(f => {
+  for (let i = 0; i < findings.length; i++) {
+    const f = findings[i];
     findingsBySeverity[f.severity] = (findingsBySeverity[f.severity] || 0) + 1;
     findingsByCategory[f.category] = (findingsByCategory[f.category] || 0) + 1;
-  });
+  }
 
   return {
     filesScanned: scannedCount,
@@ -600,20 +611,24 @@ export function exportToSarif(findings: Finding[]): string {
  */
 export function exportToCsv(findings: Finding[]): string {
   const headers = ['Repo', 'File Path', 'Line Number', 'Pattern Name', 'Category', 'Severity', 'Confidence', 'Matched Text', 'Redacted Text', 'Timestamp'];
-  const rows = findings.map(f => [
-    `"${f.repo || 'Local'}"`,
-    `"${f.filePath}"`,
-    f.lineNumber,
-    `"${f.patternName}"`,
-    `"${f.category}"`,
-    `"${f.severity}"`,
-    `"${f.confidence}"`,
-    `"${f.matchedText.replace(/"/g, '""')}"`,
-    `"${f.redactedText.replace(/"/g, '""')}"`,
-    `"${f.timestamp}"`,
-  ]);
+  const rows = new Array(findings.length);
+  for (let i = 0; i < findings.length; i++) {
+    const f = findings[i];
+    rows[i] = [
+      `"${f.repo || 'Local'}"`,
+      `"${f.filePath}"`,
+      f.lineNumber,
+      `"${f.patternName}"`,
+      `"${f.category}"`,
+      `"${f.severity}"`,
+      `"${f.confidence}"`,
+      `"${f.matchedText.replace(/"/g, '""')}"`,
+      `"${f.redactedText.replace(/"/g, '""')}"`,
+      `"${f.timestamp}"`,
+    ].join(',');
+  }
 
-  return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  return [headers.join(','), ...rows].join('\n');
 }
 
 /**
