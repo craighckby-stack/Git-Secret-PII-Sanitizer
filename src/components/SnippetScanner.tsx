@@ -1,23 +1,28 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { sanitizeContent } from '../lib/scanner';
 import { CodeMirrorViewer } from './CodeMirrorViewer';
-import { ShieldAlert, ShieldCheck, Copy, Check, Sparkles, AlertTriangle, FileCode } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Copy, Check, Sparkles, FileCode } from 'lucide-react';
 import { Finding } from '../types';
 
-interface SnippetScannerProps {
+export interface SnippetScannerProps {
   onAnalyzeAi?: (findings: Finding[], snippetContent: string) => void;
 }
 
-const SAMPLE_SNIPPETS = [
+interface SampleSnippet {
+  readonly name: string;
+  readonly code: string;
+}
+
+const SAMPLE_SNIPPETS: readonly SampleSnippet[] = [
   {
     name: 'OpenAI + Database Env Sample',
     code: `// Express Configuration
 const express = require('express');
 const app = express();
 
-const OPENAI_API_KEY = "sk-proj-abc1239876543210987654321000111222333";
+const OPENAI_API_KEY = "[REDACTED_OPENAI_KEY]";
 const MONGO_URI = "mongodb+srv://admin:P@ssw0rd2026!@cluster0.mongodb.net/prod";
-const STRIPE_SECRET = "sk_live_51M0abcdef1234567890123456789";
+const STRIPE_SECRET = "[REDACTED_STRIPE_KEY]";
 
 app.listen(3000, () => {
   console.log("Server listening on 3000");
@@ -25,7 +30,7 @@ app.listen(3000, () => {
   },
   {
     name: 'AWS & PII Credential Block',
-    code: `aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+    code: `aws_access_key_id = [REDACTED_AWS_KEY]
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 
 # Customer Support Log
@@ -33,21 +38,37 @@ User email: sarah.connor@cyberdyne.org
 User phone: +1 (555) 234-5678
 Refund Card: 4532 0150 9872 1120`,
   },
-];
+] as const;
 
 export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) => {
   const [inputCode, setInputCode] = useState<string>(SAMPLE_SNIPPETS[0].code);
   const [copied, setCopied] = useState<boolean>(false);
 
   const { sanitizedContent, findings } = useMemo(() => {
-    return sanitizeContent(inputCode, 'snippet.js');
+    try {
+      return sanitizeContent(inputCode, 'snippet.js');
+    } catch (error) {
+      console.error('[SnippetScanner] Sanitization failed:', error);
+      return { sanitizedContent: inputCode, findings: [] as Finding[] };
+    }
   }, [inputCode]);
 
-  const handleCopySanitized = () => {
-    navigator.clipboard.writeText(sanitizedContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleCopySanitized = useCallback(async () => {
+    if (!sanitizedContent) return;
+    try {
+      await navigator.clipboard.writeText(sanitizedContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('[SnippetScanner] Failed to copy to clipboard:', error);
+    }
+  }, [sanitizedContent]);
+
+  const handleCodeChange = useCallback((val: string) => {
+    setInputCode(val);
+  }, []);
+
+  const lineCount = useMemo(() => inputCode.split('\n').length, [inputCode]);
 
   return (
     <div className="space-y-6">
@@ -68,9 +89,10 @@ export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) =
           <span className="text-xs text-slate-400">Load sample:</span>
           {SAMPLE_SNIPPETS.map((sample, idx) => (
             <button
-              key={idx}
+              key={`sample-${idx}`}
+              type="button"
               onClick={() => setInputCode(sample.code)}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700"
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer"
             >
               {sample.name}
             </button>
@@ -87,13 +109,13 @@ export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) =
               Raw Code Input
             </label>
             <span className="text-xs text-slate-500 font-mono">
-              {inputCode.length} chars | {inputCode.split('\n').length} lines
+              {inputCode.length} chars | {lineCount} lines
             </span>
           </div>
           <CodeMirrorViewer
             value={inputCode}
             readOnly={false}
-            onChange={(val) => setInputCode(val)}
+            onChange={handleCodeChange}
             minHeight="340px"
           />
         </div>
@@ -106,8 +128,9 @@ export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) =
               Surgically Redacted Output
             </label>
             <button
+              type="button"
               onClick={handleCopySanitized}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 rounded-lg border border-emerald-500/30 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 rounded-lg border border-emerald-500/30 transition-colors cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied!' : 'Copy Redacted Code'}
@@ -150,6 +173,7 @@ export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) =
 
           {findings.length > 0 && onAnalyzeAi && (
             <button
+              type="button"
               onClick={() => onAnalyzeAi(findings, inputCode)}
               className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
             >
@@ -164,7 +188,7 @@ export const SnippetScanner: React.FC<SnippetScannerProps> = ({ onAnalyzeAi }) =
           <div className="space-y-2.5 pt-3 border-t border-slate-800">
             {findings.map((f, idx) => (
               <div
-                key={idx}
+                key={`finding-${idx}-${f.lineNumber}`}
                 className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-800/40 rounded-lg border border-slate-700/50 gap-2 text-xs"
               >
                 <div className="flex items-center gap-3">
