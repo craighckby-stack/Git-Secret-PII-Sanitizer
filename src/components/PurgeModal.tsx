@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Finding } from '../types';
 import { generatePurgeScript } from '../lib/purgeScript';
 import { CodeMirrorViewer } from './CodeMirrorViewer';
 import { ShieldAlert, Copy, Check, Download, X, AlertOctagon, Terminal } from 'lucide-react';
 
-interface PurgeModalProps {
+export interface PurgeModalProps {
   isOpen: boolean;
   onClose: () => void;
   repoUrl: string;
@@ -22,29 +22,36 @@ export const PurgeModal: React.FC<PurgeModalProps> = ({
   const [confirmInput, setConfirmInput] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
-  const { script, replacementsContent } = useMemo(() => {
+  const { script } = useMemo(() => {
     return generatePurgeScript(repoUrl, branch, findings);
   }, [repoUrl, branch, findings]);
 
-  if (!isOpen) return null;
+  const isConfirmed = useMemo(() => confirmInput.trim() === 'DELETE', [confirmInput]);
 
-  const isConfirmed = confirmInput.trim() === 'DELETE';
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(script);
+      setCopied(true);
+      const timer = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(timer);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  }, [script]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(script);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleDownloadScript = () => {
+  const handleDownloadScript = useCallback(() => {
     const blob = new Blob([script], { type: 'text/x-shellscript' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `purge_git_history_${Date.now()}.sh`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [script]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -64,6 +71,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
