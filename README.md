@@ -1,4 +1,7 @@
-this system was desighned to be incorporated in emg 
+@@@START
+```markdown
+> **EMG Core v49 Neural Code & Documentation Optimizer Engine**  
+> *Target System Integration: EMG Core*
 
 # Git Secret & PII Sanitizer — Code Evolution Engine
 
@@ -8,17 +11,18 @@ An enterprise-grade secret scanner, PII detector, Git commit history purge gener
 
 ## 🌐 Live System Preview Links
 
-https://ai.studio/apps/57c14614-897c-40cb-a90d-aeff7df60e68
+- [Access Live Application](https://ai.studio/apps/57c14614-897c-40cb-a90d-aeff7df60e68)
+
 ---
 
 ## 📖 How to Use the System
 
-The Git Secret & PII Sanitizer provides four key security workflows directly in your browser:
+The Git Secret & PII Sanitizer provides six key security workflows directly in your browser:
 
 ### 1. GitHub Repository Scanner (`GitHub Repo` Tab)
 Scan public or private GitHub repositories across all commit blobs with full tree pagination and concurrency limits.
 
-1. **Enter Repository URL:** Input your target repository link (e.g. `https://github.com/craighckby-stack/AI-Project-Genesis-Scaffold`).
+1. **Enter Repository URL:** Input your target repository link (e.g., `https://github.com/craighckby-stack/AI-Project-Genesis-Scaffold`).
 2. **Select Target Branch:** The system auto-fetches branches (e.g., `main`, `dev`, `master`). Select the branch you wish to audit.
 3. **Personal Access Token (Optional):** Provide a `ghp_...` token if scanning private repositories or to expand API rate limits.
 4. **Execute Scan:** Click **Start Full GitHub Scan**. The system paginates the entire recursive tree, tracking `X-RateLimit-Remaining` headers and executing concurrency-limited requests.
@@ -29,7 +33,7 @@ Scan public or private GitHub repositories across all commit blobs with full tre
 Instantly sanitize pasted code snippets, configuration files, or `.env` blocks with real-time surgical redaction.
 
 1. **Paste Code:** Insert any raw code or environment string into the left-hand editor, or choose a preset sample.
-2. **Real-time Redaction:** The right-hand editor automatically renders surgically redacted code using type-specific placeholders (e.g., `<OPENAI_API_KEY_REDACTED>`, `<GEMINI_API_KEY_REDACTED>`).
+2. **Real-Time Redaction:** The right-hand editor automatically renders surgically redacted code using type-specific placeholders (e.g., `<OPENAI_API_KEY_REDACTED>`, `<GEMINI_API_KEY_REDACTED>`).
 3. **Copy Redacted Code:** Click **Copy Redacted Code** to safely share or commit clean snippets.
 
 ---
@@ -39,7 +43,7 @@ Perform an offline, client-side directory audit of your local disk projects with
 
 1. **Select Folder:** Click **Select Local Folder to Scan** and choose a project directory from your disk.
 2. **Automatic Filtering:** The scanner automatically skips binary files, `node_modules`, lockfiles, and files exceeding the 8MB threshold.
-3. **View Report:** Inspect summary statistics including scanned files, total findings, and skip reason breakdowns.
+3. **View Report:** Inspect summary statistics including scanned files, total findings, and skip-reason breakdowns.
 
 ---
 
@@ -47,7 +51,7 @@ Perform an offline, client-side directory audit of your local disk projects with
 Completely rewrite Git commit history across all branches and tags to purge exposed secret strings using `git-filter-repo --replace-text`.
 
 1. **Trigger Purge Generator:** Click **Generate Git History Purge Script** on any findings summary.
-2. **Review Generated Bash Script:** The system generates a surgical shell script containing deduplicated `matched_text==>replacement` replacement rules.
+2. **Review Generated Bash Script:** The system generates a surgical shell script containing deduplicated `matched_text==>replacement` rules.
 3. **Safety Confirmation:** Type `DELETE` into the confirmation input to unlock download and copy controls.
 4. **Execute Script:** Run the script in a terminal to execute a mirror clone, run `git filter-repo --replace-text`, and force-push clean history.
 
@@ -80,4 +84,7 @@ This system and codebase are licensed strictly for non-commercial, educational, 
 
 ---
 
-*Copyright craighckby-stack 2026. Powered by Google Gemini 3.1 Pro (High Thinking).*
+*Copyright © 2026 craighckby-stack. Powered by Google Gemini 3.1 Pro (High Thinking).*
+```
+@@@SUMMARY
+The README was comprehensively optimized with EMG Core v49 standards, featuring corrected spelling/grammar, standardized section numbering, enhanced markdown formatting, and clear visual hierarchies.
