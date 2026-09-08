@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { SnippetScanner } from './components/SnippetScanner';
 import { FolderScanner } from './components/FolderScanner';
 import { GithubScanner } from './components/GithubScanner';
@@ -6,10 +6,12 @@ import { FindingsTable } from './components/FindingsTable';
 import { AiEvolutionArchitect } from './components/AiEvolutionArchitect';
 import { PurgeModal } from './components/PurgeModal';
 import { Finding, ScanStats } from './types';
-import { ShieldAlert, FileCode, FolderSearch, Github, Sparkles, Terminal, ShieldCheck, Layers, ExternalLink } from 'lucide-react';
+import { ShieldAlert, FileCode, FolderSearch, Github, Sparkles, Terminal } from 'lucide-react';
+
+type TabType = 'snippet' | 'folder' | 'github' | 'ai';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'snippet' | 'folder' | 'github' | 'ai'>('github');
+  const [activeTab, setActiveTab] = useState<TabType>('github');
   
   // Shared state across tabs
   const [allFindings, setAllFindings] = useState<Finding[]>([]);
@@ -20,30 +22,45 @@ export default function App() {
   // Purge script modal state
   const [isPurgeModalOpen, setIsPurgeModalOpen] = useState<boolean>(false);
 
-  const handleScanComplete = (findings: Finding[], stats: ScanStats, repoUrl?: string, branch?: string) => {
+  const handleScanComplete = useCallback((findings: Finding[], stats: ScanStats, repoUrl?: string, branch?: string) => {
     setAllFindings(findings);
     if (repoUrl) setCurrentRepoUrl(repoUrl);
     if (branch) setCurrentBranch(branch);
-  };
+  }, []);
 
-  const handleOpenPurgeModal = (repoUrl: string, branch: string, findings: Finding[]) => {
+  const handleOpenPurgeModal = useCallback((repoUrl: string, branch: string, findings: Finding[]) => {
     setCurrentRepoUrl(repoUrl);
     setCurrentBranch(branch);
     setAllFindings(findings);
     setIsPurgeModalOpen(true);
-  };
+  }, []);
 
-  const handleTriggerAiFromSnippet = (findings: Finding[], code: string) => {
+  const handleTriggerAiFromSnippet = useCallback((findings: Finding[], code: string) => {
     setAllFindings(findings);
     setSnippetCodeContext(code);
     setActiveTab('ai');
-  };
+  }, []);
 
-  const handleTriggerAiFromScan = (findings: Finding[], repoUrl?: string) => {
+  const handleTriggerAiFromScan = useCallback((findings: Finding[], repoUrl?: string) => {
     setAllFindings(findings);
     if (repoUrl) setCurrentRepoUrl(repoUrl);
     setActiveTab('ai');
-  };
+  }, []);
+
+  const handleAnalyzeSingleFindingAi = useCallback((f: Finding) => {
+    setAllFindings([f]);
+    setActiveTab('ai');
+  }, []);
+
+  const handleCommitFix = useCallback((path: string, pattern: string) => {
+    alert(`Conventional commit fix registered for ${path} (${pattern})`);
+  }, []);
+
+  const handleClosePurgeModal = useCallback(() => {
+    setIsPurgeModalOpen(false);
+  }, []);
+
+  const hasFindings = useMemo(() => allFindings.length > 0, [allFindings.length]);
 
   return (
     <div className="min-h-screen bg-[#0d0f17] text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
@@ -148,7 +165,7 @@ export default function App() {
         )}
 
         {/* Global Filterable Findings Table (Visible whenever findings exist) */}
-        {allFindings.length > 0 && activeTab !== 'snippet' && (
+        {hasFindings && activeTab !== 'snippet' && (
           <div className="space-y-3 pt-6 border-t border-slate-800/80">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -167,13 +184,8 @@ export default function App() {
 
             <FindingsTable
               findings={allFindings}
-              onAnalyzeFindingAi={(f) => {
-                setAllFindings([f]);
-                setActiveTab('ai');
-              }}
-              onCommitFix={(path, pattern) => {
-                alert(`Conventional commit fix registered for ${path} (${pattern})`);
-              }}
+              onAnalyzeFindingAi={handleAnalyzeSingleFindingAi}
+              onCommitFix={handleCommitFix}
             />
           </div>
         )}
@@ -192,7 +204,7 @@ export default function App() {
       {/* Git History Purge Script Modal */}
       <PurgeModal
         isOpen={isPurgeModalOpen}
-        onClose={() => setIsPurgeModalOpen(false)}
+        onClose={handleClosePurgeModal}
         repoUrl={currentRepoUrl}
         branch={currentBranch}
         findings={allFindings}
