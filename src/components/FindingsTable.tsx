@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Finding, Severity } from '../types';
 import { exportToJson, exportToCsv, exportToSarif } from '../lib/scanner';
 import { CodeMirrorViewer } from './CodeMirrorViewer';
 import { Filter, Download, Search, ShieldAlert, Sparkles, ChevronDown, ChevronUp, Copy, Check, GitCommit } from 'lucide-react';
 
-interface FindingsTableProps {
+export interface FindingsTableProps {
   findings: Finding[];
   onAnalyzeFindingAi?: (finding: Finding) => void;
   onCommitFix?: (filePath: string, patternName: string) => void;
@@ -21,20 +21,22 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Extract unique categories for filter dropdown
+  // Extract unique categories for filter dropdown with memoization
   const categories = useMemo(() => {
     const set = new Set<string>();
-    findings.forEach(f => set.add(f.category));
+    for (let i = 0; i < findings.length; i++) {
+      set.add(findings[i].category);
+    }
     return Array.from(set);
   }, [findings]);
 
-  // Filter findings
+  // Filter findings with optimized performance and safe string operations
   const filteredFindings = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return findings.filter(f => {
       if (severityFilter !== 'ALL' && f.severity !== severityFilter) return false;
       if (categoryFilter !== 'ALL' && f.category !== categoryFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      if (q) {
         const matchesPath = f.filePath.toLowerCase().includes(q);
         const matchesName = f.patternName.toLowerCase().includes(q);
         const matchesContext = f.contextSnippet.toLowerCase().includes(q);
@@ -44,40 +46,50 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
     });
   }, [findings, severityFilter, categoryFilter, searchQuery]);
 
-  // Handle Export Downloads
-  const handleDownload = (type: 'json' | 'csv' | 'sarif') => {
-    let content = '';
-    let filename = `security_findings_${Date.now()}`;
-    let mime = 'text/plain';
+  // Handle Export Downloads with robust error boundaries
+  const handleDownload = useCallback((type: 'json' | 'csv' | 'sarif') => {
+    try {
+      let content = '';
+      let filename = `security_findings_${Date.now()}`;
+      let mime = 'text/plain';
 
-    if (type === 'json') {
-      content = exportToJson(filteredFindings);
-      filename += '.json';
-      mime = 'application/json';
-    } else if (type === 'csv') {
-      content = exportToCsv(filteredFindings);
-      filename += '.csv';
-      mime = 'text/csv';
-    } else if (type === 'sarif') {
-      content = exportToSarif(filteredFindings);
-      filename += '.sarif';
-      mime = 'application/json';
+      if (type === 'json') {
+        content = exportToJson(filteredFindings);
+        filename += '.json';
+        mime = 'application/json';
+      } else if (type === 'csv') {
+        content = exportToCsv(filteredFindings);
+        filename += '.csv';
+        mime = 'text/csv';
+      } else if (type === 'sarif') {
+        content = exportToSarif(filteredFindings);
+        filename += '.sarif';
+        mime = 'application/json';
+      }
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export findings payload:', error);
     }
+  }, [filteredFindings]);
 
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopyRedacted = (finding: Finding) => {
-    navigator.clipboard.writeText(finding.redactedText);
-    setCopiedId(finding.id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+  const handleCopyRedacted = useCallback((finding: Finding) => {
+    try {
+      navigator.clipboard.writeText(finding.redactedText);
+      setCopiedId(finding.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy redacted text to clipboard:', error);
+    }
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -93,6 +105,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search file path or pattern..."
+              aria-label="Search findings by file path or pattern"
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500"
             />
           </div>
@@ -101,6 +114,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
+            aria-label="Filter findings by severity"
             className="px-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500"
           >
             <option value="ALL">All Severities</option>
@@ -114,6 +128,7 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filter findings by category"
             className="px-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500 max-w-[160px]"
           >
             <option value="ALL">All Categories</option>
@@ -173,6 +188,10 @@ export const FindingsTable: React.FC<FindingsTableProps> = ({
                 {/* Header Row */}
                 <div
                   onClick={() => setExpandedId(isExpanded ? null : f.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : f.id); } }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
                   className="p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-slate-800/40"
                 >
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
