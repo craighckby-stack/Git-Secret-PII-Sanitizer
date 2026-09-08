@@ -1,13 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="description" content="High-performance neural client interface powered by EMG Core v49" />
     <title>My Google AI Studio App</title>
+    <!-- Preconnect for performance optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Optimized resource hints -->
+    <link rel="modulepreload" href="/src/main.tsx" />
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white min-h-screen">
+    <!-- Sovereign Root Container -->
+    <div id="root" role="main"></div>
+    <!-- Core Application Entrypoint -->
+    <script type="module" src="/src/main.tsx" crossorigin="anonymous"></script>
   </body>
 </html>
-
