@@ -1,84 +1,98 @@
 export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 export type Confidence = 'High' | 'Medium' | 'Low';
 
+export type SecretCategory =
+  | 'Cloud Keys'
+  | 'AI & LLM Keys'
+  | 'Payment & Finance'
+  | 'Communication & Social'
+  | 'Database & Storage'
+  | 'Authentication & Tokens'
+  | 'Private Keys'
+  | 'PII & Financial Data';
+
+export type FileScanStatus = 'scanned' | 'skipped_binary' | 'skipped_large' | 'skipped_ignored';
+
+export type ChatRole = 'user' | 'assistant';
+
 export interface SecretPattern {
-  id: string;
-  name: string;
-  category: 'Cloud Keys' | 'AI & LLM Keys' | 'Payment & Finance' | 'Communication & Social' | 'Database & Storage' | 'Authentication & Tokens' | 'Private Keys' | 'PII & Financial Data';
-  regex: RegExp;
-  placeholder: string;
-  defaultConfidence: Confidence;
-  severity: Severity;
-  description?: string;
+  readonly id: string;
+  readonly name: string;
+  readonly category: SecretCategory;
+  readonly regex: RegExp;
+  readonly placeholder: string;
+  readonly defaultConfidence: Confidence;
+  readonly severity: Severity;
+  readonly description?: string;
 }
 
 export interface Finding {
-  id: string;
-  repo?: string;
-  filePath: string;
-  lineNumber: number;
-  patternId: string;
-  patternName: string;
-  category: string;
-  matchedText: string;
-  redactedText: string;
-  contextSnippet: string;
-  confidence: Confidence;
-  severity: Severity;
-  timestamp: string;
+  readonly id: string;
+  readonly repo?: string;
+  readonly filePath: string;
+  readonly lineNumber: number;
+  readonly patternId: string;
+  readonly patternName: string;
+  readonly category: SecretCategory | string;
+  readonly matchedText: string;
+  readonly redactedText: string;
+  readonly contextSnippet: string;
+  readonly confidence: Confidence;
+  readonly severity: Severity;
+  readonly timestamp: string;
 }
 
 export interface FileScanResult {
-  filePath: string;
-  fileSize: number;
-  status: 'scanned' | 'skipped_binary' | 'skipped_large' | 'skipped_ignored';
-  findingsCount: number;
+  readonly filePath: string;
+  readonly fileSize: number;
+  readonly status: FileScanStatus;
+  readonly findingsCount: number;
 }
 
 export interface SkipBreakdown {
-  binary: number;
-  tooLarge: number;
-  ignored: number;
+  readonly binary: number;
+  readonly tooLarge: number;
+  readonly ignored: number;
 }
 
 export interface ScanStats {
-  filesScanned: number;
-  filesSkipped: number;
-  skipReasons: SkipBreakdown;
-  totalFindings: number;
-  durationSeconds: number;
-  findingsBySeverity: Record<Severity, number>;
-  findingsByCategory: Record<string, number>;
+  readonly filesScanned: number;
+  readonly filesSkipped: number;
+  readonly skipReasons: SkipBreakdown;
+  readonly totalFindings: number;
+  readonly durationSeconds: number;
+  readonly findingsBySeverity: Readonly<Record<Severity, number>>;
+  readonly findingsByCategory: Readonly<Record<string, number>>;
 }
 
 export interface RepoBranch {
-  name: string;
-  protected: boolean;
-  sha: string;
+  readonly name: string;
+  readonly protected: boolean;
+  readonly sha: string;
 }
 
 export interface GitHubRepoInfo {
-  owner: string;
-  name: string;
-  defaultBranch: string;
-  branches: RepoBranch[];
-  isPrivate: boolean;
+  readonly owner: string;
+  readonly name: string;
+  readonly defaultBranch: string;
+  readonly branches: readonly RepoBranch[];
+  readonly isPrivate: boolean;
 }
 
 export interface AiAnalysisResult {
-  threatLevel: 'Critical' | 'High' | 'Medium' | 'Low';
-  summary: string;
-  blastRadius: string;
-  complianceImpact: string[];
-  remediationSteps: string[];
-  suggestedPatch: string;
-  evolutionRecommendations: string[];
-  thinkingProcess?: string;
+  readonly threatLevel: Severity;
+  readonly summary: string;
+  readonly blastRadius: string;
+  readonly complianceImpact: readonly string[];
+  readonly remediationSteps: readonly string[];
+  readonly suggestedPatch: string;
+  readonly evolutionRecommendations: readonly string[];
+  readonly thinkingProcess?: string;
 }
 
 export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
+  readonly id: string;
+  readonly role: ChatRole;
+  readonly content: string;
+  readonly timestamp: string;
 }
