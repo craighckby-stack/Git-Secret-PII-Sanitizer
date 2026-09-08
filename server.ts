@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
@@ -10,14 +10,31 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
+interface AnalyzeRequestBody {
+  findings?: unknown;
+  contextCode?: string;
+  repoUrl?: string;
+}
+
+interface ChatRequestBody {
+  question?: string;
+  history?: unknown[];
+  findings?: unknown;
+}
+
+/**
+ * Initializes and starts the Express server equipped with Vite integration and Gemini API endpoints.
+ */
+async function startServer(): Promise<void> {
   const app = express();
-  const PORT = 3000;
+  const PORT: number = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '10mb' }));
 
-  // Initialize Gemini Client
-  const getGeminiClient = () => {
+  /**
+   * Instantiates and returns the GoogleGenAI client with required security configurations.
+   */
+  const getGeminiClient = (): GoogleGenAI => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is missing.');
@@ -33,7 +50,7 @@ async function startServer() {
   };
 
   // API Route: High-Thinking Security Architect Analysis
-  app.post('/api/gemini/analyze', async (req, res) => {
+  app.post('/api/gemini/analyze', async (req: Request<{}, {}, AnalyzeRequestBody>, res: Response): Promise<void> => {
     try {
       const { findings, contextCode, repoUrl } = req.body;
       const ai = getGeminiClient();
@@ -72,17 +89,18 @@ Execute deep architectural reasoning and respond with a valid JSON object matchi
       const text = response.text || '{}';
       const parsedData = JSON.parse(text);
       res.json(parsedData);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Gemini Analyze Error:', err);
       res.status(500).json({
         error: 'Failed to analyze code security with Gemini High Thinking',
-        details: err.message,
+        details: errorMessage,
       });
     }
   });
 
   // API Route: High-Thinking Architect Chat
-  app.post('/api/gemini/chat', async (req, res) => {
+  app.post('/api/gemini/chat', async (req: Request<{}, {}, ChatRequestBody>, res: Response): Promise<void> => {
     try {
       const { question, history, findings } = req.body;
       const ai = getGeminiClient();
@@ -91,7 +109,7 @@ Execute deep architectural reasoning and respond with a valid JSON object matchi
 Findings Context:
 ${JSON.stringify(findings || [], null, 2)}
 
-User Question: ${question}`;
+User Question: ${question || ''}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
@@ -104,9 +122,10 @@ User Question: ${question}`;
       });
 
       res.json({ reply: response.text });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Gemini Chat Error:', err);
-      res.status(500).json({ error: 'Chat processing failed', details: err.message });
+      res.status(500).json({ error: 'Chat processing failed', details: errorMessage });
     }
   });
 
@@ -120,7 +139,7 @@ User Question: ${question}`;
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -130,4 +149,7 @@ User Question: ${question}`;
   });
 }
 
-startServer();
+startServer().catch((err: unknown) => {
+  console.error('Critical server startup failure:', err);
+  process.exit(1);
+});
