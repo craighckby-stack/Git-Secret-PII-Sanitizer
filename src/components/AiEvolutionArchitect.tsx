@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useTransition } from 'react';
 import { Finding, AiAnalysisResult, ChatMessage } from '../types';
 import { CodeMirrorViewer } from './CodeMirrorViewer';
 import { Sparkles, ShieldAlert, Cpu, Send, Loader2, CheckCircle2, Copy, Check, FileCode2, ArrowRight } from 'lucide-react';
@@ -20,10 +20,16 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
   const [inputQuestion, setInputQuestion] = useState<string>('');
   const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
   const [copiedPatch, setCopiedPatch] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
-  // Trigger high-thinking Gemini security analysis
-  const runDeepAnalysis = async () => {
+  // Trigger high-thinking Gemini security analysis with robust error handling
+  const runDeepAnalysis = useCallback(async () => {
+    if (isAnalyzing || findings.length === 0) return;
+    
     setIsAnalyzing(true);
+    setErrorMessage(null);
+    
     try {
       const res = await fetch('/api/gemini/analyze', {
         method: 'POST',
@@ -36,40 +42,47 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
       });
 
       if (!res.ok) {
-        throw new Error(`AI Analysis failed: ${res.statusText}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `AI Analysis failed with status ${res.status}: ${res.statusText}`);
       }
 
       const data: AiAnalysisResult = await res.json();
-      setAnalysis(data);
-
-      setChatMessages([
-        {
-          id: 'init-msg',
-          role: 'assistant',
-          content: `I have completed a high-thinking architectural security assessment for your findings. Ask me any follow-up questions about key rotation, Secret Manager integration, or CI/CD security hooks!`,
-          timestamp: new Date().toLocaleTimeString(),
-        },
-      ]);
-    } catch (err: any) {
-      alert(`AI Evolution Architect Error: ${err.message}`);
+      
+      startTransition(() => {
+        setAnalysis(data);
+        setChatMessages([
+          {
+            id: 'init-msg',
+            role: 'assistant',
+            content: `I have completed a high-thinking architectural security assessment for your findings. Ask me any follow-up questions about key rotation, Secret Manager integration, or CI/CD security hooks!`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unknown error occurred during deep analysis.';
+      setErrorMessage(message);
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, [findings, contextCode, repoUrl, isAnalyzing]);
 
-  // Send follow-up question to High-Thinking Architect Chat
-  const handleSendChat = async () => {
-    if (!inputQuestion.trim() || isSendingChat) return;
+  // Send follow-up question to High-Thinking Architect Chat with strict type safety
+  const handleSendChat = useCallback(async () => {
+    const trimmedQuestion = inputQuestion.trim();
+    if (!trimmedQuestion || isSendingChat) return;
 
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       role: 'user',
-      content: inputQuestion,
+      content: trimmedQuestion,
       timestamp: new Date().toLocaleTimeString(),
     };
 
-    setChatMessages((prev) => [...prev, userMsg]);
-    setInputQuestion('');
+    startTransition(() => {
+      setChatMessages((prev) => [...prev, userMsg]);
+      setInputQuestion('');
+    });
     setIsSendingChat(true);
 
     try {
@@ -77,36 +90,54 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: inputQuestion,
+          question: trimmedQuestion,
           history: chatMessages,
           findings,
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const assistantMsg: ChatMessage = {
-          id: `ast-${Date.now()}`,
-          role: 'assistant',
-          content: data.reply,
-          timestamp: new Date().toLocaleTimeString(),
-        };
-        setChatMessages((prev) => [...prev, assistantMsg]);
+      if (!res.ok) {
+        throw new Error(`Chat API error: ${res.statusText}`);
       }
-    } catch (err) {
-      console.error('Chat error:', err);
+
+      const data = await res.json();
+      const assistantMsg: ChatMessage = {
+        id: `ast-${Date.now()}`,
+        role: 'assistant',
+        content: data.reply ?? 'No response received from architect engine.',
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      
+      startTransition(() => {
+        setChatMessages((prev) => [...prev, assistantMsg]);
+      });
+    } catch (err: unknown) {
+      const chatErrorMsg = err instanceof Error ? err.message : 'Network failure during chat transmission.';
+      const errorMsgObj: ChatMessage = {
+        id: `err-${Date.now()}`,
+        role: 'assistant',
+        content: `[System Error]: Failed to process query. ${chatErrorMsg}`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      startTransition(() => {
+        setChatMessages((prev) => [...prev, errorMsgObj]);
+      });
     } finally {
       setIsSendingChat(false);
     }
-  };
+  }, [inputQuestion, isSendingChat, chatMessages, findings]);
 
-  const handleCopyPatch = () => {
+  const handleCopyPatch = useCallback(() => {
     if (analysis?.suggestedPatch) {
-      navigator.clipboard.writeText(analysis.suggestedPatch);
-      setCopiedPatch(true);
-      setTimeout(() => setCopiedPatch(false), 2000);
+      navigator.clipboard.writeText(analysis.suggestedPatch).then(() => {
+        setCopiedPatch(true);
+        const timer = setTimeout(() => setCopiedPatch(false), 2000);
+        return () => clearTimeout(timer);
+      }).catch((err) => {
+        console.error('Failed to copy patch code to clipboard:', err);
+      });
     }
-  };
+  }, [analysis?.suggestedPatch]);
 
   return (
     <div className="space-y-6">
@@ -148,6 +179,13 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
             )}
           </button>
         </div>
+
+        {errorMessage && (
+          <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
       </div>
 
       {/* Analysis Results Display */}
@@ -186,7 +224,7 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
               </h3>
               <ul className="space-y-2 text-xs text-slate-300">
                 {analysis.remediationSteps.map((step, idx) => (
-                  <li key={idx} className="flex items-start gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <li key={`rem-${idx}`} className="flex items-start gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
                     <span className="font-mono text-indigo-400 font-bold shrink-0">{idx + 1}.</span>
                     <span>{step}</span>
                   </li>
@@ -202,7 +240,7 @@ export const AiEvolutionArchitect: React.FC<AiEvolutionArchitectProps> = ({
               </h3>
               <ul className="space-y-2 text-xs text-slate-300">
                 {analysis.evolutionRecommendations.map((rec, idx) => (
-                  <li key={idx} className="flex items-start gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <li key={`evo-${idx}`} className="flex items-start gap-2 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
                     <ArrowRight className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
                     <span>{rec}</span>
                   </li>
