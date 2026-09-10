@@ -71,3 +71,11 @@ Line 51, Col 8: Property declaration is missing its type annotation.
 Line 194, Col 8: Property declaration is missing its type annotation.
 ```
 **CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/AiEvolutionArchitect.tsx.
+
+### ❌ [2026-09-10] src/components/SnippetScanner.tsx `source: mutation-cycle`
+**Symptom:** AST / TypeScript Compiler Validation Rejected
+**EVIDENCE (Machine-Copied Fact):**
+```
+Line 52, Col 8: Property declaration is missing its type annotation.
+```
+**CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/SnippetScanner.tsx.
