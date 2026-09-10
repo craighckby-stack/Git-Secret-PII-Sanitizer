@@ -52,3 +52,14 @@ Line 34, Col 8: Property declaration is missing its type annotation.
 [OUTPUT_LIKELY_TRUNCATED] The output is < 80% of original length and syntactically invalid. The model likely hit its output token limit.
 ```
 **CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/FindingsTable.tsx.
+
+### ❌ [2026-09-10] src/components/SnippetScanner.tsx `source: mutation-cycle`
+**Symptom:** AST / TypeScript Compiler Validation Rejected
+**EVIDENCE (Machine-Copied Fact):**
+```
+Line 134, Col 6: JSX element 'div' has no corresponding closing tag.
+Line 163, Col 44: '</' expected.
+Line 51, Col 8: Property declaration is missing its type annotation.
+[OUTPUT_LIKELY_TRUNCATED] The output is < 80% of original length and syntactically invalid. The model likely hit its output token limit.
+```
+**CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/SnippetScanner.tsx.
