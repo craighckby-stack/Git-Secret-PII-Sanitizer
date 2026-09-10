@@ -1,19 +1,31 @@
-export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
-export type Confidence = 'High' | 'Medium' | 'Low';
+export const SEVERITIES = ['Critical', 'High', 'Medium', 'Low'] as const;
+export type Severity = typeof SEVERITIES[number];
 
-export type SecretCategory =
-  | 'Cloud Keys'
-  | 'AI & LLM Keys'
-  | 'Payment & Finance'
-  | 'Communication & Social'
-  | 'Database & Storage'
-  | 'Authentication & Tokens'
-  | 'Private Keys'
-  | 'PII & Financial Data';
+export const CONFIDENCES = ['High', 'Medium', 'Low'] as const;
+export type Confidence = typeof CONFIDENCES[number];
 
-export type FileScanStatus = 'scanned' | 'skipped_binary' | 'skipped_large' | 'skipped_ignored';
+export const SECRET_CATEGORIES = [
+  'Cloud Keys',
+  'AI & LLM Keys',
+  'Payment & Finance',
+  'Communication & Social',
+  'Database & Storage',
+  'Authentication & Tokens',
+  'Private Keys',
+  'PII & Financial Data',
+] as const;
+export type SecretCategory = typeof SECRET_CATEGORIES[number];
 
-export type ChatRole = 'user' | 'assistant';
+export const FILE_SCAN_STATUSES = [
+  'scanned',
+  'skipped_binary',
+  'skipped_large',
+  'skipped_ignored',
+] as const;
+export type FileScanStatus = typeof FILE_SCAN_STATUSES[number];
+
+export const CHAT_ROLES = ['user', 'assistant'] as const;
+export type ChatRole = typeof CHAT_ROLES[number];
 
 export interface SecretPattern {
   readonly id: string;
@@ -95,4 +107,56 @@ export interface ChatMessage {
   readonly role: ChatRole;
   readonly content: string;
   readonly timestamp: string;
+}
+
+/**
+ * Runtime Type Guard Utilities
+ */
+export function isSeverity(value: unknown): value is Severity {
+  return typeof value === 'string' && SEVERITIES.includes(value as Severity);
+}
+
+export function isConfidence(value: unknown): value is Confidence {
+  return typeof value === 'string' && CONFIDENCES.includes(value as Confidence);
+}
+
+export function isSecretCategory(value: unknown): value is SecretCategory {
+  return typeof value === 'string' && SECRET_CATEGORIES.includes(value as SecretCategory);
+}
+
+export function isFileScanStatus(value: unknown): value is FileScanStatus {
+  return typeof value === 'string' && FILE_SCAN_STATUSES.includes(value as FileScanStatus);
+}
+
+export function isChatRole(value: unknown): value is ChatRole {
+  return typeof value === 'string' && CHAT_ROLES.includes(value as ChatRole);
+}
+
+export function isFinding(value: unknown): value is Finding {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === 'string' &&
+    typeof v.filePath === 'string' &&
+    typeof v.lineNumber === 'number' &&
+    typeof v.patternId === 'string' &&
+    typeof v.patternName === 'string' &&
+    typeof v.matchedText === 'string' &&
+    typeof v.redactedText === 'string' &&
+    typeof v.contextSnippet === 'string' &&
+    isConfidence(v.confidence) &&
+    isSeverity(v.severity) &&
+    typeof v.timestamp === 'string'
+  );
+}
+
+export function isChatMessage(value: unknown): value is ChatMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === 'string' &&
+    isChatRole(v.role) &&
+    typeof v.content === 'string' &&
+    typeof v.timestamp === 'string'
+  );
 }
