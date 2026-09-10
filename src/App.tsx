@@ -10,19 +10,56 @@ import { ShieldAlert, FileCode, FolderSearch, Github, Sparkles, Terminal } from 
 
 type TabType = 'snippet' | 'folder' | 'github' | 'ai';
 
+interface NavTabConfig {
+  id: TabType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  activeClass: string;
+}
+
+const DEFAULT_REPO_URL = 'https://github.com/craighckby-stack/AI-Project-Genesis-Scaffold';
+const DEFAULT_BRANCH = 'main';
+
+const NAV_TABS: NavTabConfig[] = [
+  {
+    id: 'github',
+    label: 'GitHub Repo',
+    icon: Github,
+    activeClass: 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20',
+  },
+  {
+    id: 'snippet',
+    label: 'Live Snippet',
+    icon: FileCode,
+    activeClass: 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20',
+  },
+  {
+    id: 'folder',
+    label: 'Local Folder',
+    icon: FolderSearch,
+    activeClass: 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20',
+  },
+  {
+    id: 'ai',
+    label: 'AI Architect',
+    icon: Sparkles,
+    activeClass: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20',
+  },
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('github');
   
   // Shared state across tabs
   const [allFindings, setAllFindings] = useState<Finding[]>([]);
-  const [currentRepoUrl, setCurrentRepoUrl] = useState<string>('https://github.com/craighckby-stack/AI-Project-Genesis-Scaffold');
-  const [currentBranch, setCurrentBranch] = useState<string>('main');
+  const [currentRepoUrl, setCurrentRepoUrl] = useState<string>(DEFAULT_REPO_URL);
+  const [currentBranch, setCurrentBranch] = useState<string>(DEFAULT_BRANCH);
   const [snippetCodeContext, setSnippetCodeContext] = useState<string>('');
 
   // Purge script modal state
   const [isPurgeModalOpen, setIsPurgeModalOpen] = useState<boolean>(false);
 
-  const handleScanComplete = useCallback((findings: Finding[], stats: ScanStats, repoUrl?: string, branch?: string) => {
+  const handleScanComplete = useCallback((findings: Finding[], _stats: ScanStats, repoUrl?: string, branch?: string) => {
     setAllFindings(findings);
     if (repoUrl) setCurrentRepoUrl(repoUrl);
     if (branch) setCurrentBranch(branch);
@@ -53,12 +90,18 @@ export default function App() {
   }, []);
 
   const handleCommitFix = useCallback((path: string, pattern: string) => {
-    alert(`Conventional commit fix registered for ${path} (${pattern})`);
+    if (path && pattern) {
+      console.info(`Commit fix registered for path: ${path}, pattern: ${pattern}`);
+    }
   }, []);
 
   const handleClosePurgeModal = useCallback(() => {
     setIsPurgeModalOpen(false);
   }, []);
+
+  const handlePurgeModalRequest = useCallback(() => {
+    handleOpenPurgeModal(currentRepoUrl, currentBranch, allFindings);
+  }, [handleOpenPurgeModal, currentRepoUrl, currentBranch, allFindings]);
 
   const hasFindings = useMemo(() => allFindings.length > 0, [allFindings.length]);
 
@@ -83,54 +126,27 @@ export default function App() {
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex flex-wrap items-center justify-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium w-full md:w-auto">
-            <button
-              onClick={() => setActiveTab('github')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'github'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Github className="w-3.5 h-3.5" />
-              GitHub Repo
-            </button>
-
-            <button
-              onClick={() => setActiveTab('snippet')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'snippet'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <FileCode className="w-3.5 h-3.5" />
-              Live Snippet
-            </button>
-
-            <button
-              onClick={() => setActiveTab('folder')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'folder'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <FolderSearch className="w-3.5 h-3.5" />
-              Local Folder
-            </button>
-
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'ai'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-              AI Architect
-            </button>
+          <nav role="tablist" aria-label="Scanner modes" className="flex flex-wrap items-center justify-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium w-full md:w-auto">
+            {NAV_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    isActive
+                      ? tab.activeClass
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${tab.id === 'ai' && !isActive ? 'text-purple-300' : ''}`} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
       </header>
@@ -174,7 +190,7 @@ export default function App() {
               </h2>
 
               <button
-                onClick={() => handleOpenPurgeModal(currentRepoUrl, currentBranch, allFindings)}
+                onClick={handlePurgeModalRequest}
                 className="text-xs px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-lg border border-rose-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Terminal className="w-3.5 h-3.5 text-rose-400" />
