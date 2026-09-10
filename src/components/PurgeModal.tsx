@@ -25,7 +25,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
 
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearCopyTimeout = useCallback(() => {
+  const clearCopyTimeout = useCallback((): void => {
     if (copyTimeoutRef.current !== null) {
       clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = null;
@@ -53,7 +53,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onClose();
       }
@@ -66,20 +66,20 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
   }, [isOpen, onClose]);
 
   // Generate purge script safely with error handling
-  const { script, scriptError } = useMemo(() => {
+  const { script, scriptError } = useMemo<{ script: string; scriptError: string | null }>(() => {
     try {
       const result = generatePurgeScript(repoUrl, branch, findings);
       return { script: result.script, scriptError: null };
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error generating script';
       console.error('Error generating purge script:', err);
       return { script: '# Error generating purge script.', scriptError: errorMsg };
     }
   }, [repoUrl, branch, findings]);
 
-  const isConfirmed = useMemo(() => confirmInput.trim() === 'DELETE', [confirmInput]);
+  const isConfirmed = useMemo<boolean>(() => confirmInput.trim() === 'DELETE', [confirmInput]);
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = useCallback(async (): Promise<void> => {
     clearCopyTimeout();
     setCopyError(null);
 
@@ -107,7 +107,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
         setCopied(false);
         copyTimeoutRef.current = null;
       }, 2000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to copy script text: ', err);
       setCopyError('Failed to copy');
       copyTimeoutRef.current = setTimeout(() => {
@@ -117,7 +117,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
     }
   }, [script, clearCopyTimeout]);
 
-  const handleDownloadScript = useCallback(() => {
+  const handleDownloadScript = useCallback((): void => {
     try {
       const blob = new Blob([script], { type: 'text/x-shellscript;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -128,7 +128,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to download script:', err);
     }
   }, [script]);
@@ -137,11 +137,11 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="purge-modal-title"
-      onClick={(e) => {
+      onClick={(e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
@@ -210,7 +210,7 @@ export const PurgeModal: React.FC<PurgeModalProps> = React.memo(({
               id="purge-confirm-input"
               type="text"
               value={confirmInput}
-              onChange={(e) => setConfirmInput(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmInput(e.target.value)}
               placeholder="DELETE"
               className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 font-mono focus:outline-none focus:border-rose-500"
               autoComplete="off"
