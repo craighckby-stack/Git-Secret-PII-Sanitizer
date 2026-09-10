@@ -110,26 +110,32 @@ export interface ChatMessage {
 }
 
 /**
- * Runtime Type Guard Utilities
+ * Runtime Type Guard Utilities with optimized performance lookup structures.
  */
+const SEVERITY_SET: ReadonlySet<string> = new Set(SEVERITIES);
+const CONFIDENCE_SET: ReadonlySet<string> = new Set(CONFIDENCES);
+const SECRET_CATEGORY_SET: ReadonlySet<string> = new Set(SECRET_CATEGORIES);
+const FILE_SCAN_STATUS_SET: ReadonlySet<string> = new Set(FILE_SCAN_STATUSES);
+const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
+
 export function isSeverity(value: unknown): value is Severity {
-  return typeof value === 'string' && SEVERITIES.includes(value as Severity);
+  return typeof value === 'string' && SEVERITY_SET.has(value);
 }
 
 export function isConfidence(value: unknown): value is Confidence {
-  return typeof value === 'string' && CONFIDENCES.includes(value as Confidence);
+  return typeof value === 'string' && CONFIDENCE_SET.has(value);
 }
 
 export function isSecretCategory(value: unknown): value is SecretCategory {
-  return typeof value === 'string' && SECRET_CATEGORIES.includes(value as SecretCategory);
+  return typeof value === 'string' && SECRET_CATEGORY_SET.has(value);
 }
 
 export function isFileScanStatus(value: unknown): value is FileScanStatus {
-  return typeof value === 'string' && FILE_SCAN_STATUSES.includes(value as FileScanStatus);
+  return typeof value === 'string' && FILE_SCAN_STATUS_SET.has(value);
 }
 
 export function isChatRole(value: unknown): value is ChatRole {
-  return typeof value === 'string' && CHAT_ROLES.includes(value as ChatRole);
+  return typeof value === 'string' && CHAT_ROLE_SET.has(value);
 }
 
 export function isFinding(value: unknown): value is Finding {
@@ -137,10 +143,12 @@ export function isFinding(value: unknown): value is Finding {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === 'string' &&
+    (v.repo === undefined || typeof v.repo === 'string') &&
     typeof v.filePath === 'string' &&
     typeof v.lineNumber === 'number' &&
     typeof v.patternId === 'string' &&
     typeof v.patternName === 'string' &&
+    (typeof v.category === 'string') &&
     typeof v.matchedText === 'string' &&
     typeof v.redactedText === 'string' &&
     typeof v.contextSnippet === 'string' &&
