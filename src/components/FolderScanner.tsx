@@ -1,7 +1,7 @@
-import React, { useState, useRef, ChangeEvent, FC, MouseEvent } from 'react';
+import React, { useState, useRef, useCallback, useEffect, ChangeEvent, FC } from 'react';
 import { sanitizeContent, isIgnoredPath, isBinaryContent, calculateScanStats } from '../lib/scanner';
 import { Finding, ScanStats, SkipBreakdown } from '../types';
-import { FolderSearch, FolderUp, FileText, ShieldAlert, CheckCircle2, AlertOctagon, FileCheck2, Loader2, Sparkles } from 'lucide-react';
+import { FolderSearch, FolderUp, FileCheck2, Loader2, Sparkles, XCircle } from 'lucide-react';
 
 interface FolderScannerProps {
   onScanComplete: (findings: Finding[], stats: ScanStats) => void;
@@ -15,21 +15,53 @@ interface ScanProgress {
 }
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+const UI_YIELD_INTERVAL = 25; // Yield UI thread every 25 files to preserve 60fps responsiveness
 
 export const FolderScanner: FC<FolderScannerProps> = ({ onScanComplete, onAnalyzeAi }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [progress, setProgress] = useState<ScanProgress>({ current: 0, total: 0, currentFile: '' });
   const [findings, setFindings] = useState<Finding[]>([]);
   const [stats, setStats] = useState<ScanStats | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
-  const handleFolderSelect = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleCancelScan = useCallback((): void => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (isMountedRef.current) {
+      setIsScanning(false);
+      setScanError('Directory scanning was aborted by user.');
+    }
+  }, []);
+
+  const handleFolderSelect = useCallback(async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // Reset previous state
+    setScanError(null);
     setIsScanning(true);
     setFindings([]);
     setStats(null);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const { signal } = abortController;
 
     const fileList = Array.from(files);
     const total = fileList.length;
@@ -39,63 +71,91 @@ export const FolderScanner: FC<FolderScannerProps> = ({ onScanComplete, onAnalyz
     let scannedCount = 0;
     const skipBreakdown: SkipBreakdown = { binary: 0, tooLarge: 0, ignored: 0 };
 
-    for (let i = 0; i < total; i++) {
-      const file = fileList[i];
-      const relativePath = file.webkitRelativePath || file.name;
+    try {
+      for (let i = 0; i < total; i++) {
+        if (signal.aborted || !isMountedRef.current) {
+          return;
+        }
 
-      setProgress({
-        current: i + 1,
-        total,
-        currentFile: relativePath,
-      });
+        const file = fileList[i];
+        const relativePath = file.webkitRelativePath || file.name;
 
-      if (isIgnoredPath(relativePath)) {
-        skipBreakdown.ignored++;
-        continue;
-      }
+        // Periodic state update & non-blocking yield to keep the UI smooth
+        if (i % UI_YIELD_INTERVAL === 0 || i === total - 1) {
+          if (isMountedRef.current) {
+            setProgress({
+              current: i + 1,
+              total,
+              currentFile: relativePath,
+            });
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
 
-      if (file.size > MAX_FILE_SIZE) {
-        skipBreakdown.tooLarge++;
-        continue;
-      }
-
-      try {
-        const text = await file.text();
-
-        if (isBinaryContent(text)) {
-          skipBreakdown.binary++;
+        if (isIgnoredPath(relativePath)) {
+          skipBreakdown.ignored++;
           continue;
         }
 
-        const { findings: fileFindings } = sanitizeContent(text, relativePath);
-        if (fileFindings.length > 0) {
-          localFindings.push(...fileFindings);
+        if (file.size > MAX_FILE_SIZE) {
+          skipBreakdown.tooLarge++;
+          continue;
         }
-        scannedCount++;
-      } catch {
-        skipBreakdown.binary++;
+
+        try {
+          const text = await file.text();
+
+          if (signal.aborted) return;
+
+          if (isBinaryContent(text)) {
+            skipBreakdown.binary++;
+            continue;
+          }
+
+          const { findings: fileFindings } = sanitizeContent(text, relativePath);
+          if (fileFindings.length > 0) {
+            for (let j = 0; j < fileFindings.length; j++) {
+              localFindings.push(fileFindings[j]);
+            }
+          }
+          scannedCount++;
+        } catch {
+          skipBreakdown.binary++;
+        }
       }
+
+      if (!isMountedRef.current || signal.aborted) return;
+
+      const durationSeconds = Number(((performance.now() - startTime) / 1000).toFixed(2));
+      const computedStats = calculateScanStats(scannedCount, skipBreakdown, localFindings, durationSeconds);
+
+      setFindings(localFindings);
+      setStats(computedStats);
+      setIsScanning(false);
+      onScanComplete(localFindings, computedStats);
+    } catch (err: unknown) {
+      if (isMountedRef.current && !signal.aborted) {
+        const message = err instanceof Error ? err.message : 'Unknown directory scan error occurred.';
+        setScanError(message);
+        setIsScanning(false);
+      }
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      abortControllerRef.current = null;
     }
+  }, [onScanComplete]);
 
-    const durationSeconds = Number(((performance.now() - startTime) / 1000).toFixed(2));
-    const computedStats = calculateScanStats(scannedCount, skipBreakdown, localFindings, durationSeconds);
-
-    setFindings(localFindings);
-    setStats(computedStats);
-    setIsScanning(false);
-
-    onScanComplete(localFindings, computedStats);
-  };
-
-  const handleButtonClick = (): void => {
+  const handleButtonClick = useCallback((): void => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleAiAnalysisClick = (): void => {
-    if (onAnalyzeAi) {
+  const handleAiAnalysisClick = useCallback((): void => {
+    if (onAnalyzeAi && findings.length > 0) {
       onAnalyzeAi(findings);
     }
-  };
+  }, [onAnalyzeAi, findings]);
 
   const progressPercentage = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
@@ -123,26 +183,49 @@ export const FolderScanner: FC<FolderScannerProps> = ({ onScanComplete, onAnalyz
           multiple
           onChange={handleFolderSelect}
           className="hidden"
+          aria-label="Upload Directory"
         />
 
-        <button
-          onClick={handleButtonClick}
-          disabled={isScanning}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
-        >
-          {isScanning ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Scanning Directory...
-            </>
-          ) : (
-            <>
-              <FolderUp className="w-4 h-4" />
-              Select Local Folder to Scan
-            </>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleButtonClick}
+            disabled={isScanning}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Scanning Directory...
+              </>
+            ) : (
+              <>
+                <FolderUp className="w-4 h-4" />
+                Select Local Folder to Scan
+              </>
+            )}
+          </button>
+
+          {isScanning && (
+            <button
+              type="button"
+              onClick={handleCancelScan}
+              className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-800/50 text-sm font-semibold transition-all cursor-pointer"
+            >
+              <XCircle className="w-4 h-4" />
+              Cancel
+            </button>
           )}
-        </button>
+        </div>
       </div>
+
+      {/* Scan Error Message */}
+      {scanError && (
+        <div className="p-4 bg-rose-950/40 border border-rose-800/50 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+          <XCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <span>{scanError}</span>
+        </div>
+      )}
 
       {/* Scanning Progress Banner */}
       {isScanning && (
@@ -181,6 +264,7 @@ export const FolderScanner: FC<FolderScannerProps> = ({ onScanComplete, onAnalyz
 
             {findings.length > 0 && onAnalyzeAi && (
               <button
+                type="button"
                 onClick={handleAiAnalysisClick}
                 className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
               >
