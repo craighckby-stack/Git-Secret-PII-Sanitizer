@@ -34,3 +34,11 @@ Line 191, Col 8: Property declaration is missing its type annotation.
 Line 23, Col 8: Property declaration is missing its type annotation.
 ```
 **CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/FindingsTable.tsx.
+
+### ❌ [2026-09-10] src/lib/purgeScript.ts `source: mutation-cycle`
+**Symptom:** Active Linter / Compiler Gate Rejection on LLM Output (Option B)
+**EVIDENCE (Machine-Copied Fact):**
+```
+[LINT REJECT: NO_UNVERIFIABLE_SELF_PRAISE] Detected unsubstantiated self-description in commentary: "production-grade". Output must adhere to neutral, factual documentation without marketing adjectives.
+```
+**CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/lib/purgeScript.ts.
