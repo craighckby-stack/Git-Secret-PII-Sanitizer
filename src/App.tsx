@@ -11,16 +11,16 @@ import { ShieldAlert, FileCode, FolderSearch, Github, Sparkles, Terminal } from 
 type TabType = 'snippet' | 'folder' | 'github' | 'ai';
 
 interface NavTabConfig {
-  id: TabType;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  activeClass: string;
+  readonly id: TabType;
+  readonly label: string;
+  readonly icon: React.ComponentType<{ readonly className?: string }>;
+  readonly activeClass: string;
 }
 
 const DEFAULT_REPO_URL = 'https://github.com/craighckby-stack/AI-Project-Genesis-Scaffold';
 const DEFAULT_BRANCH = 'main';
 
-const NAV_TABS: NavTabConfig[] = [
+const NAV_TABS: readonly NavTabConfig[] = [
   {
     id: 'github',
     label: 'GitHub Repo',
@@ -47,11 +47,11 @@ const NAV_TABS: NavTabConfig[] = [
   },
 ];
 
-export default function App() {
+export default function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabType>('github');
   
   // Shared state across tabs
-  const [allFindings, setAllFindings] = useState<Finding[]>([]);
+  const [allFindings, setAllFindings] = useState<readonly Finding[]>([]);
   const [currentRepoUrl, setCurrentRepoUrl] = useState<string>(DEFAULT_REPO_URL);
   const [currentBranch, setCurrentBranch] = useState<string>(DEFAULT_BRANCH);
   const [snippetCodeContext, setSnippetCodeContext] = useState<string>('');
@@ -59,47 +59,47 @@ export default function App() {
   // Purge script modal state
   const [isPurgeModalOpen, setIsPurgeModalOpen] = useState<boolean>(false);
 
-  const handleScanComplete = useCallback((findings: Finding[], _stats: ScanStats, repoUrl?: string, branch?: string) => {
+  const handleScanComplete = useCallback((findings: readonly Finding[], _stats: ScanStats, repoUrl?: string, branch?: string): void => {
     setAllFindings(findings);
     if (repoUrl) setCurrentRepoUrl(repoUrl);
     if (branch) setCurrentBranch(branch);
   }, []);
 
-  const handleOpenPurgeModal = useCallback((repoUrl: string, branch: string, findings: Finding[]) => {
+  const handleOpenPurgeModal = useCallback((repoUrl: string, branch: string, findings: readonly Finding[]): void => {
     setCurrentRepoUrl(repoUrl);
     setCurrentBranch(branch);
     setAllFindings(findings);
     setIsPurgeModalOpen(true);
   }, []);
 
-  const handleTriggerAiFromSnippet = useCallback((findings: Finding[], code: string) => {
+  const handleTriggerAiFromSnippet = useCallback((findings: readonly Finding[], code: string): void => {
     setAllFindings(findings);
     setSnippetCodeContext(code);
     setActiveTab('ai');
   }, []);
 
-  const handleTriggerAiFromScan = useCallback((findings: Finding[], repoUrl?: string) => {
+  const handleTriggerAiFromScan = useCallback((findings: readonly Finding[], repoUrl?: string): void => {
     setAllFindings(findings);
     if (repoUrl) setCurrentRepoUrl(repoUrl);
     setActiveTab('ai');
   }, []);
 
-  const handleAnalyzeSingleFindingAi = useCallback((f: Finding) => {
+  const handleAnalyzeSingleFindingAi = useCallback((f: Finding): void => {
     setAllFindings([f]);
     setActiveTab('ai');
   }, []);
 
-  const handleCommitFix = useCallback((path: string, pattern: string) => {
+  const handleCommitFix = useCallback((path: string, pattern: string): void => {
     if (path && pattern) {
       console.info(`Commit fix registered for path: ${path}, pattern: ${pattern}`);
     }
   }, []);
 
-  const handleClosePurgeModal = useCallback(() => {
+  const handleClosePurgeModal = useCallback((): void => {
     setIsPurgeModalOpen(false);
   }, []);
 
-  const handlePurgeModalRequest = useCallback(() => {
+  const handlePurgeModalRequest = useCallback((): void => {
     handleOpenPurgeModal(currentRepoUrl, currentBranch, allFindings);
   }, [handleOpenPurgeModal, currentRepoUrl, currentBranch, allFindings]);
 
@@ -174,7 +174,7 @@ export default function App() {
 
         {activeTab === 'ai' && (
           <AiEvolutionArchitect
-            findings={allFindings}
+            findings={[...allFindings]}
             contextCode={snippetCodeContext}
             repoUrl={currentRepoUrl}
           />
@@ -191,7 +191,7 @@ export default function App() {
 
               <button
                 onClick={handlePurgeModalRequest}
-                className="text-xs px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-lg border border-rose-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="text-xs px-3 py-1.5 bg-rose-600/25 hover:bg-rose-600/35 text-rose-300 rounded-lg border border-rose-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Terminal className="w-3.5 h-3.5 text-rose-400" />
                 Generate Git History Purge Script
@@ -199,7 +199,7 @@ export default function App() {
             </div>
 
             <FindingsTable
-              findings={allFindings}
+              findings={[...allFindings]}
               onAnalyzeFindingAi={handleAnalyzeSingleFindingAi}
               onCommitFix={handleCommitFix}
             />
@@ -223,7 +223,7 @@ export default function App() {
         onClose={handleClosePurgeModal}
         repoUrl={currentRepoUrl}
         branch={currentBranch}
-        findings={allFindings}
+        findings={[...allFindings]}
       />
     </div>
   );
