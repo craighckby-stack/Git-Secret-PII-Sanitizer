@@ -12,6 +12,8 @@ export interface CodeMirrorViewerProps {
   maxHeight?: string;
   onChange?: (val: string) => void;
   highlightLine?: number;
+  className?: string;
+  placeholder?: string;
 }
 
 const BASIC_SETUP = {
@@ -20,37 +22,60 @@ const BASIC_SETUP = {
   dropCursor: false,
   allowMultipleSelections: false,
   indentOnInput: false,
+  syntaxHighlighting: true,
+  bracketMatching: true,
+  closeBrackets: true,
+  autocompletion: false,
+  highlightActiveLine: true,
+  highlightSelectionMatches: false,
 } as const;
 
+// Cache default parser extensions to minimize memory allocation and re-parsing overhead
+const JSON_EXTENSION: Extension = json();
+const JS_TS_EXTENSION: Extension = javascript({ jsx: true, typescript: true });
+
 export const CodeMirrorViewer: React.FC<CodeMirrorViewerProps> = React.memo(({
-  value,
+  value = '',
   language = 'javascript',
   readOnly = true,
   minHeight = '200px',
   maxHeight = '500px',
   onChange,
+  className = '',
+  placeholder,
 }) => {
   const extensions = useMemo<Extension[]>(() => {
     try {
       if (language === 'json') {
-        return [json()];
+        return [JSON_EXTENSION];
       }
-      return [javascript({ jsx: true, typescript: true })];
-    } catch {
+      if (language === 'text') {
+        return [];
+      }
+      return [JS_TS_EXTENSION];
+    } catch (error) {
+      console.error('CodeMirrorViewer extension initialization error:', error);
       return [];
     }
   }, [language]);
 
   const handleChange = useCallback((val: string) => {
+    if (!onChange || readOnly) {
+      return;
+    }
     try {
-      onChange?.(val);
+      onChange(val);
     } catch (error) {
       console.error('CodeMirrorViewer onChange execution error:', error);
     }
-  }, [onChange]);
+  }, [onChange, readOnly]);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-700/60 bg-[#1e1e2e] shadow-inner text-sm font-mono">
+    <div
+      className={`rounded-xl overflow-hidden border border-slate-700/60 bg-[#1e1e2e] shadow-inner text-sm font-mono transition-colors focus-within:border-indigo-500/60 ${className}`}
+      role="region"
+      aria-label={`${language.toUpperCase()} Code Viewer`}
+    >
       <CodeMirror
         value={value}
         height="auto"
@@ -59,11 +84,14 @@ export const CodeMirrorViewer: React.FC<CodeMirrorViewerProps> = React.memo(({
         theme={oneDark}
         extensions={extensions}
         readOnly={readOnly}
+        editable={!readOnly}
         onChange={handleChange}
         basicSetup={BASIC_SETUP}
+        placeholder={placeholder}
       />
     </div>
   );
 });
 
 CodeMirrorViewer.displayName = 'CodeMirrorViewer';
+export default CodeMirrorViewer;
