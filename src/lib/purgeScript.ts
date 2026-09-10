@@ -8,45 +8,48 @@ export interface PurgeScriptResult {
   readonly replacementsContent: string;
 }
 
+const REPO_URL_PATTERN = /^https?:\/\/.+|\/.+|\..+/;
+const BRANCH_NAME_PATTERN = /^[\w\-./]+$/;
+const SHELL_ESCAPE_PATTERN = /(["`$()\\])/g;
+const GIT_EXTENSION_PATTERN = /\.git$/;
+
 /**
  * Validates and sanitizes a repository URL to prevent injection attacks in shell scripts.
  */
 function sanitizeRepoUrl(repoUrl: string): string {
-  if (!repoUrl || typeof repoUrl !== 'string') {
+  if (typeof repoUrl !== 'string' || repoUrl.trim() === '') {
     throw new Error('Invalid repository URL provided.');
   }
-  // Strip dangerous shell metacharacters and whitespace
   const trimmed = repoUrl.trim();
-  if (!/^https?:\/\/.+|\/.+|\..+/.test(trimmed)) {
+  if (!REPO_URL_PATTERN.test(trimmed)) {
     throw new Error('Malformed repository URL structure.');
   }
-  return trimmed.replace(/(["`$()\\])/g, '\\$1');
+  return trimmed.replace(SHELL_ESCAPE_PATTERN, '\\$1');
 }
 
 /**
  * Validates and sanitizes a git branch name.
  */
 function sanitizeBranch(branch: string): string {
-  if (!branch || typeof branch !== 'string') {
+  if (typeof branch !== 'string' || branch.trim() === '') {
     return 'main';
   }
   const trimmed = branch.trim();
-  // Git branch names should not contain control characters, spaces, or certain symbols
-  if (!/^[\w\-./]+$/.test(trimmed)) {
+  if (!BRANCH_NAME_PATTERN.test(trimmed)) {
     throw new Error('Invalid branch name characters detected.');
   }
   return trimmed;
 }
 
 /**
- * Generates a production-grade Bash script using git-filter-repo --replace-text
- * to surgically purge exposed secret strings across all Git history with hardened type-safety,
- * deterministic memory utilization, and secure input escaping.
+ * Generates a Bash script using git-filter-repo --replace-text
+ * to purge exposed secret strings across Git history with type safety,
+ * memory efficiency, and input escaping.
  */
 export function generatePurgeScript(
   repoUrl: string,
   branch: string = 'main',
-  findings: Finding[]
+  findings: Finding[] = []
 ): PurgeScriptResult {
   if (!Array.isArray(findings)) {
     throw new TypeError('Findings must be provided as an array.');
@@ -55,22 +58,26 @@ export function generatePurgeScript(
   const safeRepoUrl = sanitizeRepoUrl(repoUrl);
   const safeBranch = sanitizeBranch(branch);
 
-  // Use a memory-efficient Map for deduplication
   const replacementRules = new Map<string, string>();
 
-  for (let i = 0; i < findings.length; i++) {
+  const len = findings.length;
+  for (let i = 0; i < len; i++) {
     const f = findings[i];
-    if (f?.matchedStudly && f?.redactedText) {
-      // Fallback or explicit check for matchedText vs matchedStudly if applicable, 
-      // preserving standard property access robustly.
+    if (!f) {
+      continue;
     }
-    const matched = f?.matchedText;
-    const redacted = f?.redactedText;
+
+    const matched = f.matchedText;
+    const redacted = f.redactedText;
 
     if (typeof matched === 'string' && typeof redacted === 'string') {
       const cleanMatched = matched.trim();
       if (cleanMatched.length > 3) {
-        replacementRules.set(cleanMatched, redacted);
+        const safeMatched = cleanMatched.replace(/[\r\n]/g, '');
+        const safeRedacted = redacted.replace(/[\r\n]/g, '');
+        if (safeMatched.length > 3) {
+          replacementRules.set(safeMatched, safeRedacted);
+        }
       }
     }
   }
@@ -78,16 +85,16 @@ export function generatePurgeScript(
   const replacementCount = replacementRules.size;
   const replacementsLines: string[] = new Array(replacementCount);
   let idx = 0;
-  
-  for (const [matched, redacted] of replacementRules.entries()) {
+
+  replacementRules.forEach((redacted, matched) => {
     replacementsLines[idx++] = `${matched}==>${redacted}`;
-  }
+  });
 
   const replacementsContent = replacementsLines.join('\n');
 
   const repoNameSegments = safeRepoUrl.split('/');
   const rawRepoName = repoNameSegments[repoNameSegments.length - 1] || 'target-repo';
-  const repoName = rawRepoName.replace(/\.git$/, '') || 'target-repo';
+  const repoName = rawRepoName.replace(GIT_EXTENSION_PATTERN, '') || 'target-repo';
 
   const script = `#!/usr/bin/env bash
 # ==============================================================================
