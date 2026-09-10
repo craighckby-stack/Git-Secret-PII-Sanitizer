@@ -8,10 +8,10 @@ export interface PurgeScriptResult {
   readonly replacementsContent: string;
 }
 
-const REPO_URL_PATTERN = /^https?:\/\/.+|\/.+|\..+/;
-const BRANCH_NAME_PATTERN = /^[\w\-./]+$/;
-const SHELL_ESCAPE_PATTERN = /(["`$()\\])/g;
-const GIT_EXTENSION_PATTERN = /\.git$/;
+const REPO_URL_PATTERN: RegExp = /^https?:\/\/.+|\/.+|\..+/;
+const BRANCH_NAME_PATTERN: RegExp = /^[\w\-./]+$/;
+const SHELL_ESCAPE_PATTERN: RegExp = /(["`$()\\])/g;
+const GIT_EXTENSION_PATTERN: RegExp = /\.git$/;
 
 /**
  * Validates and sanitizes a repository URL to prevent injection attacks in shell scripts.
@@ -20,7 +20,7 @@ function sanitizeRepoUrl(repoUrl: string): string {
   if (typeof repoUrl !== 'string' || repoUrl.trim() === '') {
     throw new Error('Invalid repository URL provided.');
   }
-  const trimmed = repoUrl.trim();
+  const trimmed: string = repoUrl.trim();
   if (!REPO_URL_PATTERN.test(trimmed)) {
     throw new Error('Malformed repository URL structure.');
   }
@@ -34,7 +34,7 @@ function sanitizeBranch(branch: string): string {
   if (typeof branch !== 'string' || branch.trim() === '') {
     return 'main';
   }
-  const trimmed = branch.trim();
+  const trimmed: string = branch.trim();
   if (!BRANCH_NAME_PATTERN.test(trimmed)) {
     throw new Error('Invalid branch name characters detected.');
   }
@@ -55,26 +55,26 @@ export function generatePurgeScript(
     throw new TypeError('Findings must be provided as an array.');
   }
 
-  const safeRepoUrl = sanitizeRepoUrl(repoUrl);
-  const safeBranch = sanitizeBranch(branch);
+  const safeRepoUrl: string = sanitizeRepoUrl(repoUrl);
+  const safeBranch: string = sanitizeBranch(branch);
 
   const replacementRules = new Map<string, string>();
 
-  const len = findings.length;
+  const len: number = findings.length;
   for (let i = 0; i < len; i++) {
-    const f = findings[i];
+    const f: Finding = findings[i];
     if (!f) {
       continue;
     }
 
-    const matched = f.matchedText;
-    const redacted = f.redactedText;
+    const matched: string = f.matchedText;
+    const redacted: string = f.redactedText;
 
     if (typeof matched === 'string' && typeof redacted === 'string') {
-      const cleanMatched = matched.trim();
+      const cleanMatched: string = matched.trim();
       if (cleanMatched.length > 3) {
-        const safeMatched = cleanMatched.replace(/[\r\n]/g, '');
-        const safeRedacted = redacted.replace(/[\r\n]/g, '');
+        const safeMatched: string = cleanMatched.replace(/[\r\n]/g, '');
+        const safeRedacted: string = redacted.replace(/[\r\n]/g, '');
         if (safeMatched.length > 3) {
           replacementRules.set(safeMatched, safeRedacted);
         }
@@ -82,21 +82,21 @@ export function generatePurgeScript(
     }
   }
 
-  const replacementCount = replacementRules.size;
+  const replacementCount: number = replacementRules.size;
   const replacementsLines: string[] = new Array(replacementCount);
   let idx = 0;
 
-  replacementRules.forEach((redacted, matched) => {
+  replacementRules.forEach((redacted: string, matched: string) => {
     replacementsLines[idx++] = `${matched}==>${redacted}`;
   });
 
-  const replacementsContent = replacementsLines.join('\n');
+  const replacementsContent: string = replacementsLines.join('\n');
 
-  const repoNameSegments = safeRepoUrl.split('/');
-  const rawRepoName = repoNameSegments[repoNameSegments.length - 1] || 'target-repo';
-  const repoName = rawRepoName.replace(GIT_EXTENSION_PATTERN, '') || 'target-repo';
+  const repoNameSegments: string[] = safeRepoUrl.split('/');
+  const rawRepoName: string = repoNameSegments[repoNameSegments.length - 1] || 'target-repo';
+  const repoName: string = rawRepoName.replace(GIT_EXTENSION_PATTERN, '') || 'target-repo';
 
-  const script = `#!/usr/bin/env bash
+  const script: string = `#!/usr/bin/env bash
 # ==============================================================================
 # Git Secret & PII Sanitizer — Full Git History Purge Script
 # REPO: ${safeRepoUrl}
