@@ -10,19 +10,19 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-interface AnalyzeRequestBody {
+export interface AnalyzeRequestBody {
   findings?: unknown;
   contextCode?: string;
   repoUrl?: string;
 }
 
-interface ChatRequestBody {
+export interface ChatRequestBody {
   question?: string;
   history?: unknown[];
   findings?: unknown;
 }
 
-interface AnalysisResponse {
+export interface AnalysisResponse {
   threatLevel: 'Critical' | 'High' | 'Medium' | 'Low';
   summary: string;
   blastRadius: string;
@@ -32,10 +32,19 @@ interface AnalysisResponse {
   evolutionRecommendations: string[];
 }
 
+export interface ChatResponse {
+  reply: string;
+}
+
+export interface ErrorResponse {
+  error: string;
+  details?: string;
+}
+
 let geminiClientInstance: GoogleGenAI | null = null;
 
 /**
- * Returns a cached singleton instance of the GoogleGenAI client to avoid allocation overhead.
+ * Returns a cached singleton instance of the GoogleGenAI client.
  */
 const getGeminiClient = (): GoogleGenAI => {
   if (!geminiClientInstance) {
@@ -56,18 +65,21 @@ const getGeminiClient = (): GoogleGenAI => {
 };
 
 /**
- * Safely stringifies complex body context payloads with standard formatting.
+ * Safely stringifies unknown data payloads with fallback error handling.
  */
 const safeJsonStringify = (data: unknown, indent = 2): string => {
+  if (data === undefined || data === null) {
+    return '[]';
+  }
   try {
-    return JSON.stringify(data ?? [], null, indent);
+    return JSON.stringify(data, null, indent);
   } catch {
     return String(data);
   }
 };
 
 /**
- * Initializes and starts the Express server equipped with Vite integration and Gemini API endpoints.
+ * Initializes and starts the Express server with Vite middleware integration and Gemini endpoints.
  */
 async function startServer(): Promise<void> {
   const app = express();
@@ -77,12 +89,17 @@ async function startServer(): Promise<void> {
   app.use(express.json({ limit: '10mb' }));
 
   // API Route: High-Thinking Security Architect Analysis
-  app.post('/api/gemini/analyze', async (req: Request<{}, {}, AnalyzeRequestBody>, res: Response): Promise<void> => {
-    try {
-      const { findings, contextCode, repoUrl } = req.body;
-      const ai = getGeminiClient();
+  app.post(
+    '/api/gemini/analyze',
+    async (
+      req: Request<Record<string, unknown>, AnalysisResponse | ErrorResponse, AnalyzeRequestBody>,
+      res: Response<AnalysisResponse | ErrorResponse>
+    ): Promise<void> => {
+      try {
+        const { findings, contextCode, repoUrl } = req.body || {};
+        const ai = getGeminiClient();
 
-      const prompt = `You are a Principal Security Architect and Code Evolution Lead.
+        const prompt = `You are a Principal Security Architect and Code Evolution Lead.
 Analyze these detected exposed secret/PII findings from repository/code: ${repoUrl || 'Local Code Snippet'}
 
 Findings List:
@@ -102,65 +119,84 @@ Execute deep architectural reasoning and respond with a valid JSON object matchi
   "evolutionRecommendations": ["Architecture improvement 1", "CI/CD pre-commit hook setup suggestion"]
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: prompt,
-        config: {
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-pro-preview',
+          contents: prompt,
+          config: {
+            thinkingConfig: {
+              thinkingLevel: ThinkingLevel.HIGH,
+            },
+            responseMimeType: 'application/json',
           },
-          responseMimeType: 'application/json',
-        },
-      });
+        });
 
-      const text = response.text || '{}';
-      let parsedData: Partial<AnalysisResponse>;
-      try {
-        parsedData = JSON.parse(text);
-      } catch (parseErr) {
-        throw new Error(`Failed to parse AI structured response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+        const text = response.text || '{}';
+        let parsedData: Partial<AnalysisResponse>;
+        try {
+          parsedData = JSON.parse(text) as Partial<AnalysisResponse>;
+        } catch (parseErr) {
+          throw new Error(
+            `Failed to parse AI structured response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`
+          );
+        }
+
+        const validatedResponse: AnalysisResponse = {
+          threatLevel: parsedData.threatLevel || 'Medium',
+          summary: parsedData.summary || 'Analysis complete.',
+          blastRadius: parsedData.blastRadius || 'N/A',
+          complianceImpact: Array.isArray(parsedData.complianceImpact) ? parsedData.complianceImpact : [],
+          remediationSteps: Array.isArray(parsedData.remediationSteps) ? parsedData.remediationSteps : [],
+          suggestedPatch: parsedData.suggestedPatch || '',
+          evolutionRecommendations: Array.isArray(parsedData.evolutionRecommendations) ? parsedData.evolutionRecommendations : [],
+        };
+
+        res.json(validatedResponse);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error('Gemini Analyze Error:', err);
+        res.status(500).json({
+          error: 'Failed to analyze code security with Gemini High Thinking',
+          details: errorMessage,
+        });
       }
-
-      res.json(parsedData);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Gemini Analyze Error:', err);
-      res.status(500).json({
-        error: 'Failed to analyze code security with Gemini High Thinking',
-        details: errorMessage,
-      });
     }
-  });
+  );
 
   // API Route: High-Thinking Architect Chat
-  app.post('/api/gemini/chat', async (req: Request<{}, {}, ChatRequestBody>, res: Response): Promise<void> => {
-    try {
-      const { question, history, findings } = req.body;
-      const ai = getGeminiClient();
+  app.post(
+    '/api/gemini/chat',
+    async (
+      req: Request<Record<string, unknown>, ChatResponse | ErrorResponse, ChatRequestBody>,
+      res: Response<ChatResponse | ErrorResponse>
+    ): Promise<void> => {
+      try {
+        const { question, findings } = req.body || {};
+        const ai = getGeminiClient();
 
-      const prompt = `You are an expert Security Architect answering questions about secret mitigation, key rotation, and safe deployment.
+        const prompt = `You are an expert Security Architect answering questions about secret mitigation, key rotation, and safe deployment.
 Findings Context:
 ${safeJsonStringify(findings)}
 
 User Question: ${question || ''}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: prompt,
-        config: {
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-pro-preview',
+          contents: prompt,
+          config: {
+            thinkingConfig: {
+              thinkingLevel: ThinkingLevel.HIGH,
+            },
           },
-        },
-      });
+        });
 
-      res.json({ reply: response.text ?? '' });
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('Gemini Chat Error:', err);
-      res.status(500).json({ error: 'Chat processing failed', details: errorMessage });
+        res.json({ reply: response.text ?? '' });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error('Gemini Chat Error:', err);
+        res.status(500).json({ error: 'Chat processing failed', details: errorMessage });
+      }
     }
-  });
+  );
 
   // Vite middleware for development vs static build serving for production
   if (process.env.NODE_ENV !== 'production') {
@@ -171,14 +207,14 @@ User Question: ${question || ''}`;
     app.use(viteDevServer.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { maxAge: '1d', etag: true }));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
   // Centralized Express Error Handler
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: Error, _req: Request, res: Response<ErrorResponse>, _next: NextFunction) => {
     console.error('Unhandled Application Error:', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   });
@@ -188,7 +224,10 @@ User Question: ${question || ''}`;
   });
 
   // Graceful shutdown handling
-  const gracefulShutdown = async (signal: string) => {
+  let isShuttingDown = false;
+  const gracefulShutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     console.log(`Received ${signal}. Shutting down gracefully...`);
     if (viteDevServer) {
       await viteDevServer.close();
