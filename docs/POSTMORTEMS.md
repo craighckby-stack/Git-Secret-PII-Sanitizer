@@ -79,3 +79,25 @@ Line 194, Col 8: Property declaration is missing its type annotation.
 Line 52, Col 8: Property declaration is missing its type annotation.
 ```
 **CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/SnippetScanner.tsx.
+
+### ❌ [2026-09-10] src/components/FindingsTable.tsx `source: mutation-cycle`
+**Symptom:** AST / TypeScript Compiler Validation Rejected
+**EVIDENCE (Machine-Copied Fact):**
+```
+Line 1, Col 1: Declaration or statement expected.
+Line 1, Col 2: Unexpected keyword or identifier.
+Line 1, Col 7: Declaration or statement expected.
+Line 1, Col 8: Declaration or statement expected.
+Line 2, Col 23: ';' expected.
+Line 5, Col 13: JSX expressions must have one parent element.
+Line 10, Col 11: Declaration or statement expected.
+Line 15, Col 23: Property assignment expected.
+Line 15, Col 25: ',' expected.
+Line 15, Col 65: ';' expected.
+Line 15, Col 101: Declaration or statement expected.
+Line 16, Col 23: ';' expected.
+Line 25, Col 11: Declaration or statement expected.
+Line 26, Col 9: Expression expected.
+[OUTPUT_LIKELY_TRUNCATED] The output is < 80% of original length and syntactically invalid. The model likely hit its output token limit.
+```
+**CONSTRAINT (Model Generalization):** Never repeat code patterns that produce this compiler/linter error on src/components/FindingsTable.tsx.
